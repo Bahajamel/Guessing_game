@@ -146,6 +146,8 @@ describe( 'GuessingGame', function(){
         it('giveToken revert if not tokenOwner', async function () {
 
 
+
+
           await expect(
              contract.connect(player1).GiveToken(player2.address)).to.be.revertedWith("Not token owner");
         });
@@ -249,6 +251,75 @@ it('correct guess ', async function () {
 
 });
 
+
+describe('withdrawRemaining', function () {
+    it('reverts if game is still active', async function () {
+        await contract.initGame(fonds, secret, { value: fonds });
+
+        await expect(
+            contract.withdrawRemaining()
+        ).to.be.revertedWith('Game still active');
+    });
+
+    it('reverts if nothing to withdraw (balance = 0)', async function () {
+        
+        await expect(
+            contract.withdrawRemaining()
+        ).to.be.revertedWith('Nothing to withdraw');
+    });
+
+    it('reverts if caller is not the owner', async function () {
+        await contract.initGame(fonds, secret, { value: fonds });
+
+        
+        await contract.GiveToken(player1.address);
+        await contract.connect(player1).Guess(secret, fonds, player2.address);
+
+        await expect(
+            contract.connect(player1).withdrawRemaining()
+        ).to.be.revertedWith('only owner can call the function');
+    });
+
+    it('reverts with nothing to withdraw after a correct guess drains the pool', async function () {
+
+        await contract.initGame(fonds, secret, { value: fonds });
+
+        await contract.GiveToken(player1.address);
+        await contract.connect(player1).Guess(secret,fonds, player2.address);
+
+        // gameActive = false, balance = 0 ici donc rien à retirer
+        await expect(
+            contract.withdrawRemaining()
+        ).to.be.revertedWith('Nothing to withdraw');
+    });
+
+    it('owner receives exactly the remaining balanc', async function () {
+        await contract.initGame(fonds,secret, { value: fonds });
+
+        
+        await contract.GiveToken(player1.address);
+        await contract.connect(player1).Guess(secret,fonds, player2.address);
+
+
+        const ownerBalBefore = await ethers.provider.getBalance(owner.address);
+        const contractBal    = await ethers.provider.getBalance(contract.address);
+
+        if (contractBal.gt(0)) {
+            const tx      = await contract.withdrawRemaining();
+            const receipt = await tx.wait();
+            const gasUsed = receipt.gasUsed.mul(receipt.effectiveGasPrice);
+
+            const ownerBalAfter = await ethers.provider.getBalance(owner.address);
+
+            expect(ownerBalAfter).to.equal(
+                ownerBalBefore.add(contractBal).sub(gasUsed)
+            );
+            expect(
+                await ethers.provider.getBalance(contract.address)
+            ).to.equal(0);
+        }
+    });
+});
 
 
 

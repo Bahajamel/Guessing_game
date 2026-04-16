@@ -93,6 +93,16 @@ contract GuessingGame {
 
 
     }
+
+    
+    // Récupérer les ETH restants après la fin
+  function withdrawRemaining() external onlyOwner {
+    require(!gameActive, "Game still active");
+    uint256 remaining = address(this).balance;
+    require(remaining > 0, "Nothing to withdraw");
+    (bool success,) = payable(owner).call{value: remaining}("");
+    require(success, "Transfer failed");
+}
     function getOwner() public view returns (address) {
         return owner;
     }
